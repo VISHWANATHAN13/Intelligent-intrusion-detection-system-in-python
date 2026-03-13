@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta http-equiv="Content-Type" content="text/html;charset=utf8">
+    <meta name="viewport" content="width=device-width, user-scalable=no">
+    <meta name="robots" content="noindex, nofollow">
+
+    <!-- ===== ORIGINAL LINKS (UNTOUCHED) ===== -->
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <!-- <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.min.js"></script> -->
+    <!-- <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.5.0/Chart.min.js"></script> -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <!-- <script src="static/js/application.js"></script> -->
+
+    <link rel="stylesheet" type="text/css" href="static/css/thirdparty.min.css">
+    <link rel="stylesheet" type="text/css" href="static/css/main.css">
+    <link rel="stylesheet" type="text/css" href="static/css/media.css">
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <!-- ===== END ORIGINAL LINKS ===== -->
+
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        /* ─── RESET & BASE ─────────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:      #030a0f;
+            --panel:   #050e17;
+            --border:  #0ff3;
+            --cyan:    #00f5ff;
+            --green:   #00ff88;
+            --red:     #ff2d55;
+            --yellow:  #ffd700;
+            --dim:     #0a1a26;
+            --text:    #a8d8ea;
+            --mono:    'Share Tech Mono', monospace;
+            --display: 'Orbitron', sans-serif;
+        }
+
+        html, body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--mono);
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        /* ─── MATRIX CANVAS ────────────────────────────────── */
+        #matrix-bg {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+            opacity: 0.07;
+            pointer-events: none;
+        }
+
+        /* ─── SCAN-LINE OVERLAY ─────────────────────────────── */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0,245,255,0.015) 2px,
+                rgba(0,245,255,0.015) 4px
+            );
+            z-index: 1;
+            pointer-events: none;
+            animation: scanMove 8s linear infinite;
+        }
+        @keyframes scanMove {
+            from { background-position: 0 0; }
+            to   { background-position: 0 80px; }
+        }
+
+        /* ─── CONTENT LAYER ─────────────────────────────────── */
+        body > *:not(#matrix-bg) { position: relative; z-index: 2; }
+
+        /* ─── HEADER ────────────────────────────────────────── */
+        .cyber-header {
+            width: 100%;
+            padding: 32px 40px 24px;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(160deg, #020d14 0%, #051824 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        .cyber-title {
+            font-family: var(--display);
+            font-size: clamp(18px, 3.5vw, 38px);
+            font-weight: 900;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            text-align: center;
+            color: #fff;
+            text-shadow:
+                0 0 10px var(--cyan),
+                0 0 30px var(--cyan),
+                0 0 60px rgba(0,245,255,0.4);
+            animation: titlePulse 4s ease-in-out infinite;
+        }
+        @keyframes titlePulse {
+            0%,100% { text-shadow: 0 0 10px var(--cyan), 0 0 30px var(--cyan), 0 0 60px rgba(0,245,255,0.4); }
+            50%      { text-shadow: 0 0 20px var(--cyan), 0 0 50px var(--cyan), 0 0 100px rgba(0,245,255,0.6); }
+        }
+        .cyber-subtitle {
+            font-size: 11px;
+            letter-spacing: 3px;
+            color: var(--cyan);
+            opacity: 0.7;
+            text-transform: uppercase;
+        }
+        .badge-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+        .badge {
+            font-family: var(--mono);
+            font-size: 10px;
+            letter-spacing: 2px;
+            padding: 3px 10px;
+            border: 1px solid;
+            border-radius: 2px;
+            text-transform: uppercase;
+        }
+        .badge-green  { color: var(--green);  border-color: var(--green);  box-shadow: 0 0 6px var(--green); }
+        .badge-cyan   { color: var(--cyan);   border-color: var(--cyan);   box-shadow: 0 0 6px var(--cyan); }
+        .badge-yellow { color: var(--yellow); border-color: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
+
+        /* ─── RISK BANNER ───────────────────────────────────── */
+        .risk-banner {
+            margin: 28px auto;
+            max-width: 860px;
+            padding: 22px 32px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: linear-gradient(135deg, #051420 0%, #071e30 100%);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 40px rgba(0,245,255,0.07);
+        }
+        .risk-banner::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--cyan), var(--green), transparent);
+            animation: scanBar 3s linear infinite;
+        }
+        @keyframes scanBar {
+            from { transform: translateX(-100%); }
+            to   { transform: translateX(100%); }
+        }
+        .risk-label {
+            font-family: var(--display);
+            font-size: 10px;
+            letter-spacing: 4px;
+            color: var(--cyan);
+            opacity: 0.6;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .risk-value {
+            font-family: var(--display);
+            font-size: clamp(18px, 3vw, 28px);
+            font-weight: 700;
+            letter-spacing: 3px;
+            color: #fff;
+            text-shadow: 0 0 16px var(--cyan);
+        }
+        /* Risk level color overrides applied via JS */
+        .risk-HIGH   { color: var(--red)    !important; text-shadow: 0 0 20px var(--red)    !important; }
+        .risk-MEDIUM { color: var(--yellow) !important; text-shadow: 0 0 20px var(--yellow) !important; }
+        .risk-LOW    { color: var(--green)  !important; text-shadow: 0 0 20px var(--green)  !important; }
+
+        /* ─── DIVIDER ────────────────────────────────────────── */
+        .cyber-hr {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 32px 0;
+            position: relative;
+        }
+        .cyber-hr::after {
+            content: '◈';
+            position: absolute;
+            left: 50%; top: -9px;
+            transform: translateX(-50%);
+            background: var(--bg);
+            padding: 0 10px;
+            color: var(--cyan);
+            font-size: 12px;
+            opacity: 0.5;
+        }
+
+        /* ─── SECTION LABEL ─────────────────────────────────── */
+        .section-label {
+            font-family: var(--display);
+            font-size: 11px;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: var(--cyan);
+            opacity: 0.8;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .section-label::before {
+            content: '▸';
+            color: var(--green);
+        }
+        .section-label::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(90deg, var(--cyan), transparent);
+            opacity: 0.25;
+        }
+
+        /* ─── PANEL ─────────────────────────────────────────── */
+        .cyber-panel {
+            background: #071e2e;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 24px;
+            margin-bottom: 32px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 30px rgba(0,245,255,0.04), inset 0 0 60px rgba(0,0,0,0.3);
+        }
+        .corner-tl, .corner-tr, .corner-bl, .corner-br {
+            position: absolute; width: 12px; height: 12px;
+        }
+        .corner-tl { top:0; left:0;   border-top:2px solid var(--cyan); border-left:2px solid var(--cyan); }
+        .corner-tr { top:0; right:0;  border-top:2px solid var(--cyan); border-right:2px solid var(--cyan); }
+        .corner-bl { bottom:0; left:0;  border-bottom:2px solid var(--cyan); border-left:2px solid var(--cyan); }
+        .corner-br { bottom:0; right:0; border-bottom:2px solid var(--cyan); border-right:2px solid var(--cyan); }
+
+        /* ─── LIME EXPLANATION PANEL ────────────────────────── */
+        .lime-inner {
+            font-size: 13px;
+            line-height: 1.8;
+            color: var(--text);
+        }
+        /* Style any table injected by LIME */
+        .lime-inner table, .exp-container table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            font-family: var(--mono);
+        }
+        .lime-inner table th, .exp-container table th {
+            background: #061420;
+            color: var(--cyan);
+            padding: 9px 14px;
+            text-align: left;
+            letter-spacing: 2px;
+            font-size: 10px;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+            font-weight: normal;
+        }
+        .lime-inner table td, .exp-container table td {
+            padding: 9px 14px;
+            border-bottom: 1px solid rgba(0,245,255,0.06);
+            color: var(--text);
+        }
+        .lime-inner table tr:hover td, .exp-container table tr:hover td {
+            background: rgba(0,245,255,0.05);
+        }
+        /* Style bar spans inside LIME */
+        .lime-inner span[style*="background"], .exp-container span[style*="background"] {
+            border-radius: 2px;
+            box-shadow: 0 0 6px rgba(0,245,255,0.3);
+        }
+
+        /* ─── AE PLOT ───────────────────────────────────────── */
+        .ae-inner { min-height: 200px; }
+        .ae-inner .plotly-graph-div { border-radius: 3px; overflow: hidden; }
+
+        /* ─── FEATURES TABLE ────────────────────────────────── */
+        .table2 {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            font-family: var(--mono);
+        }
+        .table2 tr { border-bottom: 1px solid rgba(0,245,255,0.06); }
+        .table2 tr:hover { background: rgba(0,245,255,0.04); }
+        .table2 td {
+            padding: 9px 14px;
+            color: var(--text);
+            vertical-align: top;
+        }
+        /* Style nested tables generated by Flask/Jinja */
+        .table2 table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        .table2 table th {
+            background: #061420;
+            color: var(--cyan);
+            padding: 8px 12px;
+            text-align: left;
+            letter-spacing: 2px;
+            font-size: 10px;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+            font-weight: normal;
+        }
+        .table2 table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid rgba(0,245,255,0.06);
+        }
+        .table2 table tr:nth-child(even) td { background: rgba(0,245,255,0.02); }
+        .table2 table td:first-child { color: var(--green); }
+
+        /* ─── BOOTSTRAP OVERRIDE ────────────────────────────── */
+        .container { max-width: 1100px; }
+        .jumbotron  { display: none; }
+        h3 { display: none; }  /* replaced by .section-label */
+        .table-bordered { border-color: var(--border) !important; }
+
+        /* ─── FOOTER ────────────────────────────────────────── */
+        .cyber-footer {
+            margin-top: 40px;
+            padding: 16px 40px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 10px;
+            letter-spacing: 2px;
+            color: rgba(168,216,234,0.3);
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .footer-id { color: var(--cyan); opacity: 0.4; }
+
+        /* ─── ANIMATIONS ─────────────────────────────────────── */
+        .fade-in {
+            animation: fadeUp 0.6s ease both;
+        }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in:nth-child(2) { animation-delay: 0.15s; }
+        .fade-in:nth-child(3) { animation-delay: 0.30s; }
+        .fade-in:nth-child(4) { animation-delay: 0.45s; }
+    </style>
+</head>
+<body>
+
+<!-- MATRIX RAIN -->
+<canvas id="matrix-bg"></canvas>
+
+<!-- ─── HEADER ─────────────────────────────────────────────── -->
+<div class="cyber-header">
+    <div class="badge-row">
+        <span class="badge badge-green">● Analysis Complete</span>
+        <span class="badge badge-cyan">LIME Explainability</span>
+        <span class="badge badge-yellow">AutoEncoder Active</span>
+    </div>
+    <h1 class="cyber-title">CyberSentry</h1>
+    <p class="cyber-subtitle">Advanced Network Monitoring System — Analysis Report</p>
+</div>
+
+<!-- ─── HIDDEN ORIGINAL JUMBOTRON (compatibility) ─────────── -->
+<div class="container" style="display:none;">
+    <div class="jumbotron">
+        <h1>CyberSentry:Advanced Network Monitoring System</h1>
+    </div>
+</div>
+
+<!-- ─── RISK RESULT ─────────────────────────────────────────── -->
+<div class="container fade-in">
+    <div class="risk-banner">
+        <div class="risk-label">Threat Assessment Result</div>
+        <div class="risk-value" id="risk-display">{{ risk|safe }}</div>
+    </div>
+</div>
+
+<div class="cyber-hr"></div>
+
+<!-- ─── LIME EXPLANATION ─────────────────────────────────────── -->
+{% if exp %}
+<div class="container fade-in">
+    <div class="section-label">LIME Explainability — Random Forest Classifier (Top-6 Features)</div>
+    <div class="cyber-panel">
+        <div class="corner-tl"></div><div class="corner-tr"></div>
+        <div class="corner-bl"></div><div class="corner-br"></div>
+        <div class="lime-inner exp-container">
+            {{ exp|safe }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="cyber-hr"></div>
+
+<!-- ─── AUTOENCODER PLOT ──────────────────────────────────────── -->
+<div class="container fade-in">
+    <div class="section-label">AutoEncoder — Feature Reconstruction Error Ranking</div>
+    <div class="cyber-panel">
+        <div class="corner-tl"></div><div class="corner-tr"></div>
+        <div class="corner-bl"></div><div class="corner-br"></div>
+        <div class="ae-inner">
+            {{ ae_plot|safe }}
+        </div>
+    </div>
+</div>
+
+<div class="cyber-hr"></div>
+
+<!-- ─── FEATURE TABLE ────────────────────────────────────────── -->
+<div class="container fade-in">
+    <div class="section-label">All Features &amp; Values Used for Inference</div>
+    <div class="cyber-panel">
+        <div class="corner-tl"></div><div class="corner-tr"></div>
+        <div class="corner-bl"></div><div class="corner-br"></div>
+        <table class="table2 table-bordered">
+            {% for table in tables %}
+            <tr>
+                <td>{{ table|safe }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</div>
+
+<!-- ─── FOOTER ──────────────────────────────────────────────── -->
+<div class="cyber-footer">
+    <span>CyberSentry — ML + Network Security Final Year Project</span>
+    <span class="footer-id" id="session-id">REPORT-ID: INIT...</span>
+</div>
+
+<!-- ─── MATRIX RAIN ──────────────────────────────────────────── -->
+<script>
+(function () {
+    const canvas = document.getElementById('matrix-bg');
+    const ctx = canvas.getContext('2d');
+    let W, H, cols, drops;
+    function init() {
+        W = canvas.width  = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+        cols = Math.floor(W / 14);
+        drops = Array.from({ length: cols }, () => Math.random() * -H / 14);
+    }
+    const chars = 'アイウエオカキクケコ01010110ABCDEF<>{}[]|/\\+-*#@!?';
+    function draw() {
+        ctx.fillStyle = 'rgba(3,10,15,0.05)';
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#00f5ff';
+        ctx.font = '13px Share Tech Mono, monospace';
+        drops.forEach((y, i) => {
+            const ch = chars[Math.floor(Math.random() * chars.length)];
+            ctx.fillText(ch, i * 14, y * 14);
+            if (y * 14 > H && Math.random() > 0.975) drops[i] = 0;
+            drops[i] += 0.5;
+        });
+    }
+    init();
+    window.addEventListener('resize', init);
+    setInterval(draw, 50);
+})();
+
+// Risk level color
+(function() {
+    const el = document.getElementById('risk-display');
+    if (!el) return;
+    const txt = el.textContent.toUpperCase();
+    if (txt.includes('HIGH') || txt.includes('ATTACK') || txt.includes('MALICIOUS')) {
+        el.classList.add('risk-HIGH');
+    } else if (txt.includes('MEDIUM') || txt.includes('SUSPICIOUS')) {
+        el.classList.add('risk-MEDIUM');
+    } else if (txt.includes('LOW') || txt.includes('NORMAL') || txt.includes('BENIGN')) {
+        el.classList.add('risk-LOW');
+    }
+})();
+
+// Plotly dark theme patch
+(function waitForPlotly() {
+    if (window.Plotly) {
+        var layout = {
+            paper_bgcolor: '#071e2e',
+            plot_bgcolor:  '#071e2e',
+            font: { color: '#a8d8ea', family: 'Share Tech Mono' },
+            xaxis: { gridcolor: 'rgba(0,245,255,0.1)', zerolinecolor: 'rgba(0,245,255,0.2)' },
+            yaxis: { gridcolor: 'rgba(0,245,255,0.1)', zerolinecolor: 'rgba(0,245,255,0.2)' }
+        };
+        document.querySelectorAll('.plotly-graph-div').forEach(function(div) {
+            try { Plotly.relayout(div, layout); } catch(e) {}
+        });
+    } else {
+        setTimeout(waitForPlotly, 300);
+    }
+})();
+
+document.getElementById('session-id').textContent =
+    'REPORT-ID: ' + Math.random().toString(36).slice(2,10).toUpperCase();
+</script>
+
+</body>
+</html>
